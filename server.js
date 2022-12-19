@@ -1,17 +1,34 @@
+require('dotenv').config()
 const express = require('express')
 const path = require('path')
 const app = express()
 const cors = require('cors')
 const {bots, playerRecord} = require('./data')
 const {shuffleArray} = require('./utils')
+const {ROLLBAR_KEY} = process.env
+
 
 app.use(express.json())
 app.use(cors())
 
 
+// include and initialize the rollbar library with your access token
+var Rollbar = require('rollbar')
+var rollbar = new Rollbar({
+  accessToken: ROLLBAR_KEY,
+  captureUncaught: true,
+  captureUnhandledRejections: true,
+})
+
+// record a generic message and send it to Rollbar
+rollbar.log('Hello world!')
+
+
+
 app.use(express.static('public'))
 
 app.get('/', (req, res)=>{
+    rollbar.info('User visited your website!')
     res.sendFile(path.join(__dirname, './public/index.html'))
 })
 
@@ -20,6 +37,7 @@ app.get('/api/robots', (req, res) => {
         res.status(200).send(bots)
     } catch (error) {
         console.log('ERROR GETTING BOTS', error)
+        rollbar.error("User couldn't get all robots")
         res.sendStatus(400)
     }
 })
@@ -31,6 +49,7 @@ app.get('/api/robots/five', (req, res) => {
         let compDuo = shuffled.slice(6, 8)
         res.status(200).send({choices, compDuo})
     } catch (error) {
+        rollbar.error("User could't get 5 bots")
         console.log('ERROR GETTING FIVE BOTS', error)
         res.sendStatus(400)
     }
@@ -56,13 +75,16 @@ app.post('/api/duel', (req, res) => {
         // comparing the total health to determine a winner
         if (compHealthAfterAttack > playerHealthAfterAttack) {
             playerRecord.losses++
+            rollbar.info("User lost to Computer in the game!")
             res.status(200).send('You lost!')
         } else {
             playerRecord.losses++
+            rollbar.info("User won the game!")
             res.status(200).send('You won!')
         }
     } catch (error) {
         console.log('ERROR DUELING', error)
+        rollbar.critical('Duel failed!')
         res.sendStatus(400)
     }
 })
